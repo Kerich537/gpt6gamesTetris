@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tetris</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#080f20;color:#f8fafc;font:16px system-ui,sans-serif;display:flex;justify-content:center;padding:18px}
+main{width:min(100%,460px);background:#0f1b30;border:1px solid #263a5b;border-radius:18px;padding:16px}
+header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}.logo{font-size:27px;font-weight:900;letter-spacing:2px}.stats{text-align:right;color:#93a8ca;font-size:13px}.stats b{color:white;font-size:18px}
+canvas{display:block;width:min(100%,300px);height:auto;margin:auto;border:2px solid #263a5b;border-radius:8px;background:#080f20;touch-action:manipulation}
+#status{text-align:center;color:#a8bad8;font-size:13px;min-height:24px;margin:9px 0}
+.controls{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.controls button,.wide{border:1px solid #263a5b;border-radius:12px;background:#1a2b48;color:#f8fafc;font-size:22px;font-weight:700;padding:14px 4px;cursor:pointer}.controls button:active,.wide:active{background:#1d4ed8}.wide{width:100%;font-size:15px;margin-top:8px;padding:13px}.hint{text-align:center;color:#7f95ba;font-size:11px;margin-top:12px}
+</style></head>
+<body><main>
+<header><div class="logo">🟦 TETRIS</div><div class="stats">Счёт <b id="score">0</b><br>Линии <b id="lines">0</b></div></header>
+<canvas id="board" width="300" height="600" aria-label="Игровое поле"></canvas>
+<div id="status">Собирай полные линии!</div>
+<div class="controls">
+<button data-act="left" aria-label="Влево">◀</button><button data-act="rotate" aria-label="Повернуть">⟳</button><button data-act="right" aria-label="Вправо">▶</button><button data-act="down" aria-label="Вниз">▼</button>
+</div>
+<button class="wide" data-act="drop">⬇ Сбросить вниз</button><button class="wide" data-act="restart">↻ Начать заново</button>
+<div class="hint">Клавиши: ← → движение · ↑ поворот · ↓ вниз · пробел — сброс</div>
+</main>
+<script>
+(()=> {
+const canvas=document.querySelector('#board'),ctx=canvas.getContext('2d'),W=10,H=20,S=30;
+const scoreEl=document.querySelector('#score'),linesEl=document.querySelector('#lines'),status=document.querySelector('#status');
+const shapes=[
+{c:'#22d3ee',m:[[1,1,1,1]]},{c:'#3b82f6',m:[[1,0,0],[1,1,1]]},
+{c:'#f97316',m:[[0,0,1],[1,1,1]]},{c:'#facc15',m:[[1,1],[1,1]]},
+{c:'#22c55e',m:[[0,1,1],[1,1,0]]},{c:'#a855f7',m:[[0,1,0],[1,1,1]]},
+{c:'#ef4444',m:[[1,1,0],[0,1,1]]}];
+let grid,cur,score,lines,over,last=0;
+function fresh(){grid=Array.from({length:H},()=>Array(W).fill(null));score=0;lines=0;over=false;spawn();update();status.textContent='Собирай полные линии!';draw();}
+function spawn(){const s=shapes[Math.floor(Math.random()*shapes.length)];cur={m:s.m.map(r=>r.slice()),c:s.c,x:Math.floor((W-s.m[0].length)/2),y:0};if(hit(cur.x,cur.y,cur.m)){over=true;status.textContent='Игра окончена — начни заново.';}}
+function hit(x,y,m){for(let r=0;r<m.length;r++)for(let c=0;c<m[r].length;c++)if(m[r][c]){let xx=x+c,yy=y+r;if(xx<0||xx>=W||yy>=H||(yy>=0&&grid[yy][xx]))return true;}return false;}
+function lock(){cur.m.forEach((row,r)=>row.forEach((v,c)=>{if(v&&cur.y+r>=0)grid[cur.y+r][cur.x+c]=cur.c;}));let n=0;for(let y=H-1;y>=0;y--)if(grid[y].every(Boolean)){grid.splice(y,1);grid.unshift(Array(W).fill(null));n++;y++;}if(n){lines+=n;score+=[0,100,300,500,800][n]||800;status.textContent='Отлично! Линий собрано: '+n;}spawn();update();}
+function move(dx,dy){if(over)return;if(!hit(cur.x+dx,cur.y+dy,cur.m)){cur.x+=dx;cur.y+=dy;draw();return true;}if(dy>0){lock();draw();}return false;}
+function rotate(){if(over)return;const m=cur.m[0].map((_,i)=>cur.m.map(row=>row[i]).reverse());for(const k of [0,-1,1,-2,2])if(!hit(cur.x+k,cur.y,m)){cur.x+=k;cur.m=m;draw();return;}}
+function drop(){if(over)return;while(!hit(cur.x,cur.y+1,cur.m))cur.y++;score+=2;lock();draw();}
+function update(){scoreEl.textContent=score;linesEl.textContent=lines;}
+function draw(){ctx.clearRect(0,0,300,600);ctx.fillStyle='#080f20';ctx.fillRect(0,0,300,600);ctx.strokeStyle='#17243b';ctx.lineWidth=1;for(let x=0;x<=W;x++){ctx.beginPath();ctx.moveTo(x*S,0);ctx.lineTo(x*S,600);ctx.stroke();}for(let y=0;y<=H;y++){ctx.beginPath();ctx.moveTo(0,y*S);ctx.lineTo(300,y*S);ctx.stroke();}
+function cell(x,y,c){ctx.fillStyle=c;ctx.fillRect(x*S+1,y*S+1,S-2,S-2);ctx.fillStyle='rgba(255,255,255,.22)';ctx.fillRect(x*S+3,y*S+3,S-6,4);ctx.strokeStyle='rgba(0,0,0,.3)';ctx.strokeRect(x*S+1.5,y*S+1.5,S-3,S-3);}
+grid.forEach((row,y)=>row.forEach((c,x)=>{if(c)cell(x,y,c)}));if(cur)cur.m.forEach((row,y)=>row.forEach((v,x)=>{if(v&&cur.y+y>=0)cell(cur.x+x,cur.y+y,cur.c)}));if(over){ctx.fillStyle='rgba(2,6,23,.82)';ctx.fillRect(0,240,300,120);ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='bold 21px system-ui';ctx.fillText('ИГРА ОКОНЧЕНА',150,292);ctx.font='14px system-ui';ctx.fillText('Нажми «Начать заново»',150,322);}}
+function act(a){if(a==='left')move(-1,0);if(a==='right')move(1,0);if(a==='down')move(0,1);if(a==='rotate')rotate();if(a==='drop')drop();if(a==='restart')fresh();}
+document.querySelectorAll('button[data-act]').forEach(b=>b.addEventListener('click',()=>act(b.dataset.act)));
+document.addEventListener('keydown',e=>{const m={ArrowLeft:'left',ArrowRight:'right',ArrowDown:'down',ArrowUp:'rotate',' ':'drop'};if(m[e.key]){e.preventDefault();act(m[e.key]);}});
+function tick(now){if(!document.hidden&&!over){if(!last)last=now;if(now-last>Math.max(110,650-lines*22)){move(0,1);last=now;}}requestAnimationFrame(tick);}
+fresh();requestAnimationFrame(tick);
+})();
+</script></body></html>
