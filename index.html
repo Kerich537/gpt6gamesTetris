@@ -1,51 +1,459 @@
-<!doctype html>
+
+<!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Tetris</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Тетрис</title>
 <style>
-*{box-sizing:border-box}body{margin:0;background:#080f20;color:#f8fafc;font:16px system-ui,sans-serif;display:flex;justify-content:center;padding:18px}
-main{width:min(100%,460px);background:#0f1b30;border:1px solid #263a5b;border-radius:18px;padding:16px}
-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}.logo{font-size:27px;font-weight:900;letter-spacing:2px}.stats{text-align:right;color:#93a8ca;font-size:13px}.stats b{color:white;font-size:18px}
-canvas{display:block;width:min(100%,300px);height:auto;margin:auto;border:2px solid #263a5b;border-radius:8px;background:#080f20;touch-action:manipulation}
-#status{text-align:center;color:#a8bad8;font-size:13px;min-height:24px;margin:9px 0}
-.controls{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.controls button,.wide{border:1px solid #263a5b;border-radius:12px;background:#1a2b48;color:#f8fafc;font-size:22px;font-weight:700;padding:14px 4px;cursor:pointer}.controls button:active,.wide:active{background:#1d4ed8}.wide{width:100%;font-size:15px;margin-top:8px;padding:13px}.hint{text-align:center;color:#7f95ba;font-size:11px;margin-top:12px}
-</style></head>
-<body><main>
-<header><div class="logo">🟦 TETRIS</div><div class="stats">Счёт <b id="score">0</b><br>Линии <b id="lines">0</b></div></header>
-<canvas id="board" width="300" height="600" aria-label="Игровое поле"></canvas>
-<div id="status">Собирай полные линии!</div>
-<div class="controls">
-<button data-act="left" aria-label="Влево">◀</button><button data-act="rotate" aria-label="Повернуть">⟳</button><button data-act="right" aria-label="Вправо">▶</button><button data-act="down" aria-label="Вниз">▼</button>
-</div>
-<button class="wide" data-act="drop">⬇ Сбросить вниз</button><button class="wide" data-act="restart">↻ Начать заново</button>
-<div class="hint">Клавиши: ← → движение · ↑ поворот · ↓ вниз · пробел — сброс</div>
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+html, body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #080f20;
+  color: white;
+  font-family: system-ui, sans-serif;
+  overscroll-behavior: none;
+}
+body {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+header {
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  background: #101a30;
+}
+h1 {
+  margin: 0;
+  font-size: 20px;
+}
+.stats {
+  font-size: 13px;
+  text-align: right;
+  color: #cbd5e1;
+}
+main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  padding: 4px;
+}
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+.controls {
+  flex: 0 0 auto;
+  padding: 8px 10px max(8px, env(safe-area-inset-bottom));
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 7px;
+  background: #101a30;
+}
+button {
+  min-width: 0;
+  min-height: 48px;
+  border: 1px solid #344563;
+  border-radius: 12px;
+  background: #1b2943;
+  color: white;
+  font-size: 21px;
+  font-weight: 700;
+  touch-action: manipulation;
+  user-select: none;
+}
+button:active {
+  background: #344563;
+  transform: scale(.96);
+}
+#restart {
+  grid-column: 1 / -1;
+  min-height: 40px;
+  font-size: 15px;
+  background: #2563eb;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>ТЕТРИС</h1>
+  <div class="stats">
+    Очки: <b id="score">0</b><br>
+    Линии: <b id="lines">0</b>
+  </div>
+</header>
+
+<main>
+  <canvas id="game"></canvas>
 </main>
+
+<div class="controls">
+  <button data-act="left" aria-label="Влево">←</button>
+  <button data-act="rotate" aria-label="Повернуть">↻</button>
+  <button data-act="right" aria-label="Вправо">→</button>
+  <button data-act="down" aria-label="Вниз">↓</button>
+  <button data-act="drop" aria-label="Сбросить">⤓</button>
+  <button id="restart" data-act="restart">Начать заново</button>
+</div>
+
 <script>
-(()=> {
-const canvas=document.querySelector('#board'),ctx=canvas.getContext('2d'),W=10,H=20,S=30;
-const scoreEl=document.querySelector('#score'),linesEl=document.querySelector('#lines'),status=document.querySelector('#status');
-const shapes=[
-{c:'#22d3ee',m:[[1,1,1,1]]},{c:'#3b82f6',m:[[1,0,0],[1,1,1]]},
-{c:'#f97316',m:[[0,0,1],[1,1,1]]},{c:'#facc15',m:[[1,1],[1,1]]},
-{c:'#22c55e',m:[[0,1,1],[1,1,0]]},{c:'#a855f7',m:[[0,1,0],[1,1,1]]},
-{c:'#ef4444',m:[[1,1,0],[0,1,1]]}];
-let grid,cur,score,lines,over,last=0;
-function fresh(){grid=Array.from({length:H},()=>Array(W).fill(null));score=0;lines=0;over=false;spawn();update();status.textContent='Собирай полные линии!';draw();}
-function spawn(){const s=shapes[Math.floor(Math.random()*shapes.length)];cur={m:s.m.map(r=>r.slice()),c:s.c,x:Math.floor((W-s.m[0].length)/2),y:0};if(hit(cur.x,cur.y,cur.m)){over=true;status.textContent='Игра окончена — начни заново.';}}
-function hit(x,y,m){for(let r=0;r<m.length;r++)for(let c=0;c<m[r].length;c++)if(m[r][c]){let xx=x+c,yy=y+r;if(xx<0||xx>=W||yy>=H||(yy>=0&&grid[yy][xx]))return true;}return false;}
-function lock(){cur.m.forEach((row,r)=>row.forEach((v,c)=>{if(v&&cur.y+r>=0)grid[cur.y+r][cur.x+c]=cur.c;}));let n=0;for(let y=H-1;y>=0;y--)if(grid[y].every(Boolean)){grid.splice(y,1);grid.unshift(Array(W).fill(null));n++;y++;}if(n){lines+=n;score+=[0,100,300,500,800][n]||800;status.textContent='Отлично! Линий собрано: '+n;}spawn();update();}
-function move(dx,dy){if(over)return;if(!hit(cur.x+dx,cur.y+dy,cur.m)){cur.x+=dx;cur.y+=dy;draw();return true;}if(dy>0){lock();draw();}return false;}
-function rotate(){if(over)return;const m=cur.m[0].map((_,i)=>cur.m.map(row=>row[i]).reverse());for(const k of [0,-1,1,-2,2])if(!hit(cur.x+k,cur.y,m)){cur.x+=k;cur.m=m;draw();return;}}
-function drop(){if(over)return;while(!hit(cur.x,cur.y+1,cur.m))cur.y++;score+=2;lock();draw();}
-function update(){scoreEl.textContent=score;linesEl.textContent=lines;}
-function draw(){ctx.clearRect(0,0,300,600);ctx.fillStyle='#080f20';ctx.fillRect(0,0,300,600);ctx.strokeStyle='#17243b';ctx.lineWidth=1;for(let x=0;x<=W;x++){ctx.beginPath();ctx.moveTo(x*S,0);ctx.lineTo(x*S,600);ctx.stroke();}for(let y=0;y<=H;y++){ctx.beginPath();ctx.moveTo(0,y*S);ctx.lineTo(300,y*S);ctx.stroke();}
-function cell(x,y,c){ctx.fillStyle=c;ctx.fillRect(x*S+1,y*S+1,S-2,S-2);ctx.fillStyle='rgba(255,255,255,.22)';ctx.fillRect(x*S+3,y*S+3,S-6,4);ctx.strokeStyle='rgba(0,0,0,.3)';ctx.strokeRect(x*S+1.5,y*S+1.5,S-3,S-3);}
-grid.forEach((row,y)=>row.forEach((c,x)=>{if(c)cell(x,y,c)}));if(cur)cur.m.forEach((row,y)=>row.forEach((v,x)=>{if(v&&cur.y+y>=0)cell(cur.x+x,cur.y+y,cur.c)}));if(over){ctx.fillStyle='rgba(2,6,23,.82)';ctx.fillRect(0,240,300,120);ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='bold 21px system-ui';ctx.fillText('ИГРА ОКОНЧЕНА',150,292);ctx.font='14px system-ui';ctx.fillText('Нажми «Начать заново»',150,322);}}
-function act(a){if(a==='left')move(-1,0);if(a==='right')move(1,0);if(a==='down')move(0,1);if(a==='rotate')rotate();if(a==='drop')drop();if(a==='restart')fresh();}
-document.querySelectorAll('button[data-act]').forEach(b=>b.addEventListener('click',()=>act(b.dataset.act)));
-document.addEventListener('keydown',e=>{const m={ArrowLeft:'left',ArrowRight:'right',ArrowDown:'down',ArrowUp:'rotate',' ':'drop'};if(m[e.key]){e.preventDefault();act(m[e.key]);}});
-function tick(now){if(!document.hidden&&!over){if(!last)last=now;if(now-last>Math.max(110,650-lines*22)){move(0,1);last=now;}}requestAnimationFrame(tick);}
-fresh();requestAnimationFrame(tick);
+(() => {
+'use strict';
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+const W = 10;
+const H = 20;
+
+const COLORS = [
+  '#22d3ee', '#3b82f6', '#f97316',
+  '#facc15', '#a855f7', '#22c55e', '#ef4444'
+];
+
+const SHAPES = [
+  [[1,1,1,1]],
+  [[1,0,0],[1,1,1]],
+  [[0,0,1],[1,1,1]],
+  [[1,1],[1,1]],
+  [[0,1,1],[1,1,0]],
+  [[0,1,0],[1,1,1]],
+  [[1,1,0],[0,1,1]]
+];
+
+let grid, cur, score, lines, over, last, accumulator;
+let fastDrop = false;
+let fastTimer = 0;
+let lastFastMove = 0;
+let lastTime = 0;
+let cellSize = 20;
+let offsetX = 0;
+let offsetY = 0;
+let boardWidth = 0;
+let boardHeight = 0;
+
+function resize() {
+  const rect = canvas.getBoundingClientRect();
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+
+  canvas.width = Math.round(rect.width * dpr);
+  canvas.height = Math.round(rect.height * dpr);
+
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  cellSize = Math.min(rect.width / W, rect.height / H);
+  boardWidth = cellSize * W;
+  boardHeight = cellSize * H;
+  offsetX = (rect.width - boardWidth) / 2;
+  offsetY = (rect.height - boardHeight) / 2;
+
+  draw();
+}
+
+function fresh() {
+  grid = Array.from({length: H}, () => Array(W).fill(null));
+  score = 0;
+  lines = 0;
+  over = false;
+  last = 0;
+  accumulator = 0;
+  stopFastDrop();
+  updateStats();
+  spawn();
+  draw();
+}
+
+function spawn() {
+  const i = Math.floor(Math.random() * SHAPES.length);
+  const m = SHAPES[i].map(row => row.slice());
+
+  cur = {
+    m,
+    x: Math.floor((W - m[0].length) / 2),
+    y: 0,
+    c: COLORS[i]
+  };
+
+  if (collides(cur.x, cur.y, cur.m)) {
+    over = true;
+  }
+}
+
+function collides(px, py, matrix) {
+  for (let y = 0; y < matrix.length; y++) {
+    for (let x = 0; x < matrix[y].length; x++) {
+      if (!matrix[y][x]) continue;
+
+      const nx = px + x;
+      const ny = py + y;
+
+      if (nx < 0 || nx >= W || ny >= H) return true;
+      if (ny >= 0 && grid[ny][nx]) return true;
+    }
+  }
+  return false;
+}
+
+function move(dx, dy) {
+  if (over || !cur) return false;
+
+  if (!collides(cur.x + dx, cur.y + dy, cur.m)) {
+    cur.x += dx;
+    cur.y += dy;
+    draw();
+    return true;
+  }
+
+  if (dy > 0) lockPiece();
+  return false;
+}
+
+function rotate() {
+  if (over || !cur) return;
+
+  const rotated = cur.m[0].map((_, x) =>
+    cur.m.map(row => row[x]).reverse()
+  );
+
+  if (!collides(cur.x, cur.y, rotated)) {
+    cur.m = rotated;
+  } else if (!collides(cur.x - 1, cur.y, rotated)) {
+    cur.x--;
+    cur.m = rotated;
+  } else if (!collides(cur.x + 1, cur.y, rotated)) {
+    cur.x++;
+    cur.m = rotated;
+  }
+
+  draw();
+}
+
+function lockPiece() {
+  cur.m.forEach((row, y) => {
+    row.forEach((v, x) => {
+      if (v && cur.y + y >= 0) {
+        grid[cur.y + y][cur.x + x] = cur.c;
+      }
+    });
+  });
+
+  let cleared = 0;
+
+  for (let y = H - 1; y >= 0; y--) {
+    if (grid[y].every(Boolean)) {
+      grid.splice(y, 1);
+      grid.unshift(Array(W).fill(null));
+      cleared++;
+      y++;
+    }
+  }
+
+  if (cleared) {
+    lines += cleared;
+    score += [0, 100, 300, 500, 800][cleared] || cleared * 200;
+    updateStats();
+  }
+
+  spawn();
+  draw();
+}
+
+function drop() {
+  if (over || !cur) return;
+
+  while (move(0, 1)) {
+    score += 2;
+  }
+
+  if (!over) {
+    lockPiece();
+  }
+
+  updateStats();
+  draw();
+}
+
+function updateStats() {
+  document.getElementById('score').textContent = score;
+  document.getElementById('lines').textContent = lines;
+}
+
+function cell(x, y, color) {
+  const px = offsetX + x * cellSize;
+  const py = offsetY + y * cellSize;
+
+  ctx.fillStyle = color;
+  ctx.fillRect(px + 1, py + 1, cellSize - 2, cellSize - 2);
+
+  ctx.fillStyle = 'rgba(255,255,255,.2)';
+  ctx.fillRect(px + 3, py + 3, Math.max(0, cellSize - 6), 4);
+
+  ctx.strokeStyle = 'rgba(0,0,0,.3)';
+  ctx.strokeRect(px + 1.5, py + 1.5,
+    cellSize - 3, cellSize - 3);
+}
+
+function draw() {
+  if (!ctx || !canvas.width) return;
+
+  const rect = canvas.getBoundingClientRect();
+  const cw = rect.width;
+  const ch = rect.height;
+
+  ctx.clearRect(0, 0, cw, ch);
+  ctx.fillStyle = '#080f20';
+  ctx.fillRect(0, 0, cw, ch);
+
+  ctx.fillStyle = '#17243b';
+
+  for (let x = 0; x <= W; x++) {
+    const px = offsetX + x * cellSize;
+    ctx.fillRect(px, offsetY, 1, boardHeight);
+  }
+
+  for (let y = 0; y <= H; y++) {
+    const py = offsetY + y * cellSize;
+    ctx.fillRect(offsetX, py, boardWidth, 1);
+  }
+
+  grid.forEach((row, y) =>
+    row.forEach((c, x) => {
+      if (c) cell(x, y, c);
+    })
+  );
+
+  if (cur) {
+    cur.m.forEach((row, y) =>
+      row.forEach((v, x) => {
+        if (v && cur.y + y >= 0) {
+          cell(cur.x + x, cur.y + y, cur.c);
+        }
+      })
+    );
+  }
+
+  if (over) {
+    const boxW = Math.min(cw - 12, 300);
+    const boxH = 116;
+    const bx = (cw - boxW) / 2;
+    const by = (ch - boxH) / 2;
+
+    ctx.fillStyle = 'rgba(2,6,23,.9)';
+    ctx.fillRect(bx, by, boxW, boxH);
+
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 19px system-ui';
+    ctx.fillText('ИГРА ОКОНЧЕНА', cw / 2, by + 38);
+
+    ctx.font = '14px system-ui';
+    ctx.fillText('Нажми «Начать заново»',
+      cw / 2, by + 68);
+  }
+}
+
+function act(a) {
+  if (a === 'left') move(-1, 0);
+  if (a === 'right') move(1, 0);
+  if (a === 'down') move(0, 1);
+  if (a === 'rotate') rotate();
+  if (a === 'drop') drop();
+  if (a === 'restart') fresh();
+}
+
+document.querySelectorAll('button[data-act]').forEach(b => {
+  b.addEventListener('click', () => act(b.dataset.act));
+});
+
+function startFastDrop(e) {
+  if (e.target.closest('button')) return;
+  if (over) return;
+
+  e.preventDefault();
+  fastDrop = true;
+  lastFastMove = 0;
+  move(0, 1);
+}
+
+function stopFastDrop() {
+  fastDrop = false;
+  lastFastMove = 0;
+}
+
+canvas.addEventListener('pointerdown', startFastDrop);
+window.addEventListener('pointerup', stopFastDrop);
+window.addEventListener('pointercancel', stopFastDrop);
+window.addEventListener('blur', stopFastDrop);
+
+document.addEventListener('keydown', e => {
+  const map = {
+    ArrowLeft: 'left',
+    ArrowRight: 'right',
+    ArrowDown: 'down',
+    ArrowUp: 'rotate',
+    ' ': 'drop'
+  };
+
+  if (map[e.key]) {
+    e.preventDefault();
+    act(map[e.key]);
+  }
+});
+
+function tick(now) {
+  if (!last) last = now;
+
+  const dt = Math.min(now - last, 100);
+  last = now;
+
+  if (!document.hidden && !over) {
+    accumulator += dt;
+
+    const interval = Math.max(110, 650 - lines * 22);
+
+    if (accumulator >= interval) {
+      move(0, 1);
+      accumulator = 0;
+    }
+
+    if (fastDrop) {
+      fastTimer += dt;
+
+      if (fastTimer >= 55) {
+        move(0, 1);
+        fastTimer = 0;
+      }
+    } else {
+      fastTimer = 0;
+    }
+  }
+
+  requestAnimationFrame(tick);
+}
+
+window.addEventListener('resize', resize);
+
+fresh();
+resize();
+requestAnimationFrame(tick);
+
 })();
-</script></body></html>
+</script>
+</body>
+</html>
